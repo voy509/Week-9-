@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, AlertCircle, Trash2 } from 'lucide-react';
+import storage from '../utils/storage';
 
 const WeeklyBudgetPlanner = () => {
   const [weeks, setWeeks] = useState([
@@ -46,15 +47,10 @@ const WeeklyBudgetPlanner = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        if (!window.storage) {
-          console.error('window.storage is not available!');
-          return;
-        }
-
         console.log('Loading data from storage...');
-        const savedMasterBills = await window.storage.get('masterBills');
-        const savedAssignedBills = await window.storage.get('assignedBills');
-        const savedUnassignedBills = await window.storage.get('unassignedBills');
+        const savedMasterBills = await storage.get('masterBills');
+        const savedAssignedBills = await storage.get('assignedBills');
+        const savedUnassignedBills = await storage.get('unassignedBills');
 
         if (savedMasterBills) {
           console.log('Loaded masterBills:', savedMasterBills);
@@ -77,17 +73,12 @@ const WeeklyBudgetPlanner = () => {
   useEffect(() => {
     const saveData = async () => {
       try {
-        if (!window.storage) {
-          console.error('window.storage is not available for saving!');
-          return;
-        }
-
         console.log('Saving data to storage...');
-        await window.storage.set('masterBills', JSON.stringify(masterBills));
-        await window.storage.set('assignedBills', JSON.stringify(assignedBills));
-        await window.storage.set('unassignedBills', JSON.stringify(unassignedBills));
-        await window.storage.set('weeks', JSON.stringify(weeks));
-        await window.storage.set('incomeAmounts', JSON.stringify({ amountX: incomeAmountX, amountY: incomeAmountY }));
+        await storage.set('masterBills', JSON.stringify(masterBills));
+        await storage.set('assignedBills', JSON.stringify(assignedBills));
+        await storage.set('unassignedBills', JSON.stringify(unassignedBills));
+        await storage.set('weeks', JSON.stringify(weeks));
+        await storage.set('incomeAmounts', JSON.stringify({ amountX: incomeAmountX, amountY: incomeAmountY }));
         console.log('Data saved successfully!');
       } catch (error) {
         console.error('Failed to save data:', error);
