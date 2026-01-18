@@ -71,6 +71,7 @@ const WeeklyBudgetPlanner = () => {
 
   // Save data whenever it changes
   useEffect(() => {
+    console.log('Save useEffect triggered! masterBills count:', masterBills.length);
     const saveData = async () => {
       try {
         console.log('Saving data to storage...');
@@ -389,6 +390,7 @@ const WeeklyBudgetPlanner = () => {
   };
 
   const handleAddBill = () => {
+    console.log('handleAddBill called');
     if (!newBillForm.name || !newBillForm.amount || !newBillForm.dueDay) return;
 
     const newBill = {
@@ -399,6 +401,7 @@ const WeeklyBudgetPlanner = () => {
       active: true
     };
 
+    console.log('Adding new bill:', newBill);
     setMasterBills([...masterBills, newBill]);
     setNewBillForm({ name: '', amount: '', dueDay: '' });
   };
