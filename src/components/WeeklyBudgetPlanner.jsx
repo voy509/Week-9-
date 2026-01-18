@@ -18,13 +18,7 @@ const WeeklyBudgetPlanner = () => {
     { id: 12, friday: '3/6/26', income: 1800 },
   ]);
 
-  const [masterBills, setMasterBills] = useState([
-    { id: 1, name: 'Mortgage', amount: 1500, dueDay: 15, active: true },
-    { id: 2, name: 'Electric', amount: 150, dueDay: 20, active: true },
-    { id: 3, name: 'Water', amount: 80, dueDay: 25, active: true },
-    { id: 4, name: 'Internet', amount: 100, dueDay: 10, active: true },
-    { id: 5, name: 'Car Payment', amount: 450, dueDay: 18, active: true },
-  ]);
+  const [masterBills, setMasterBills] = useState([]);
 
   const [assignedBills, setAssignedBills] = useState({
     1: [], 2: [], 3: [], 4: [], 5: [], 6: [],
