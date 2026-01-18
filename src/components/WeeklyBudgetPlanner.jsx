@@ -42,6 +42,7 @@ const WeeklyBudgetPlanner = () => {
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: '', dueDay: '' });
   const [incomeAmountX, setIncomeAmountX] = useState(2500);
   const [incomeAmountY, setIncomeAmountY] = useState(1800);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Load saved data on mount
   useEffect(() => {
@@ -64,6 +65,8 @@ const WeeklyBudgetPlanner = () => {
         }
       } catch (error) {
         console.error('Error loading data:', error);
+      } finally {
+        setIsInitialLoad(false);
       }
     };
     loadData();
@@ -71,6 +74,12 @@ const WeeklyBudgetPlanner = () => {
 
   // Save data whenever it changes
   useEffect(() => {
+    // Skip saving during initial load to prevent overwriting saved data with defaults
+    if (isInitialLoad) {
+      console.log('Skipping save during initial load');
+      return;
+    }
+
     console.log('Save useEffect triggered! masterBills count:', masterBills.length);
     const saveData = async () => {
       try {
@@ -86,7 +95,7 @@ const WeeklyBudgetPlanner = () => {
       }
     };
     saveData();
-  }, [masterBills, assignedBills, unassignedBills, weeks, incomeAmountX, incomeAmountY]);
+  }, [masterBills, assignedBills, unassignedBills, weeks, incomeAmountX, incomeAmountY, isInitialLoad]);
 
   useEffect(() => {
     const today = new Date();
