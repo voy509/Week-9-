@@ -98,6 +98,12 @@ const WeeklyBudgetPlanner = () => {
   }, [masterBills, assignedBills, unassignedBills, weeks, incomeAmountX, incomeAmountY, isInitialLoad]);
 
   useEffect(() => {
+    // Skip bill generation during initial load to prevent duplicates
+    if (isInitialLoad) {
+      console.log('Skipping bill generation during initial load');
+      return;
+    }
+
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
@@ -138,7 +144,7 @@ const WeeklyBudgetPlanner = () => {
       const activeMasterIds = new Set(masterBills.filter(b => b.active).map(b => b.id));
       setUnassignedBills(prev => prev.filter(b => activeMasterIds.has(b.originalId)));
     }
-  }, [masterBills]);
+  }, [masterBills, isInitialLoad]);
 
   useEffect(() => {
     if (!draggedBill && autoScrollInterval) {
