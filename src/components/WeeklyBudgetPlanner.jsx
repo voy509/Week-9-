@@ -46,11 +46,18 @@ const WeeklyBudgetPlanner = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
+        if (!window.storage) {
+          console.error('window.storage is not available!');
+          return;
+        }
+
+        console.log('Loading data from storage...');
         const savedMasterBills = await window.storage.get('masterBills');
         const savedAssignedBills = await window.storage.get('assignedBills');
         const savedUnassignedBills = await window.storage.get('unassignedBills');
 
         if (savedMasterBills) {
+          console.log('Loaded masterBills:', savedMasterBills);
           setMasterBills(JSON.parse(savedMasterBills.value));
         }
         if (savedAssignedBills) {
@@ -60,7 +67,7 @@ const WeeklyBudgetPlanner = () => {
           setUnassignedBills(JSON.parse(savedUnassignedBills.value));
         }
       } catch (error) {
-        console.log('No saved data found, using defaults');
+        console.error('Error loading data:', error);
       }
     };
     loadData();
@@ -70,11 +77,18 @@ const WeeklyBudgetPlanner = () => {
   useEffect(() => {
     const saveData = async () => {
       try {
+        if (!window.storage) {
+          console.error('window.storage is not available for saving!');
+          return;
+        }
+
+        console.log('Saving data to storage...');
         await window.storage.set('masterBills', JSON.stringify(masterBills));
         await window.storage.set('assignedBills', JSON.stringify(assignedBills));
         await window.storage.set('unassignedBills', JSON.stringify(unassignedBills));
         await window.storage.set('weeks', JSON.stringify(weeks));
         await window.storage.set('incomeAmounts', JSON.stringify({ amountX: incomeAmountX, amountY: incomeAmountY }));
+        console.log('Data saved successfully!');
       } catch (error) {
         console.error('Failed to save data:', error);
       }
