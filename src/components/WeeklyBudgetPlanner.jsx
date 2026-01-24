@@ -2,27 +2,62 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, AlertCircle, Trash2 } from 'lucide-react';
 import storage from '../utils/storage';
 
+// Helper function to get the most recent Friday from a given date
+const getMostRecentFriday = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = day >= 5 ? day - 5 : day + 2; // 5 = Friday
+  d.setDate(d.getDate() - diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+// Helper function to format date as M/D/YY
+const formatDate = (date) => {
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const year = String(date.getFullYear()).slice(-2);
+  return `${month}/${day}/${year}`;
+};
+
+// Generate weeks: 4 past weeks + 52 future weeks = 56 total
+const generateWeeks = (incomeX, incomeY) => {
+  const today = new Date();
+  const mostRecentFriday = getMostRecentFriday(today);
+
+  // Start 4 weeks before the most recent Friday
+  const startDate = new Date(mostRecentFriday);
+  startDate.setDate(startDate.getDate() - (4 * 7));
+
+  const weeks = [];
+  for (let i = 0; i < 56; i++) {
+    const weekDate = new Date(startDate);
+    weekDate.setDate(weekDate.getDate() + (i * 7));
+
+    weeks.push({
+      id: i + 1,
+      friday: formatDate(weekDate),
+      income: i % 2 === 0 ? incomeX : incomeY
+    });
+  }
+
+  return weeks;
+};
+
 const WeeklyBudgetPlanner = () => {
-  const [weeks, setWeeks] = useState([
-    { id: 1, friday: '12/19/25', income: 2500 },
-    { id: 2, friday: '12/26/25', income: 1800 },
-    { id: 3, friday: '1/2/26', income: 2500 },
-    { id: 4, friday: '1/9/26', income: 1800 },
-    { id: 5, friday: '1/16/26', income: 2500 },
-    { id: 6, friday: '1/23/26', income: 1800 },
-    { id: 7, friday: '1/30/26', income: 2500 },
-    { id: 8, friday: '2/6/26', income: 1800 },
-    { id: 9, friday: '2/13/26', income: 2500 },
-    { id: 10, friday: '2/20/26', income: 1800 },
-    { id: 11, friday: '2/27/26', income: 2500 },
-    { id: 12, friday: '3/6/26', income: 1800 },
-  ]);
+  const [incomeAmountX, setIncomeAmountX] = useState(2500);
+  const [incomeAmountY, setIncomeAmountY] = useState(1800);
+  const [weeks, setWeeks] = useState(() => generateWeeks(2500, 1800));
 
   const [masterBills, setMasterBills] = useState([]);
 
-  const [assignedBills, setAssignedBills] = useState({
-    1: [], 2: [], 3: [], 4: [], 5: [], 6: [],
-    7: [], 8: [], 9: [], 10: [], 11: [], 12: [],
+  // Initialize assignedBills dynamically based on weeks
+  const [assignedBills, setAssignedBills] = useState(() => {
+    const initial = {};
+    for (let i = 1; i <= 56; i++) {
+      initial[i] = [];
+    }
+    return initial;
   });
 
   const [unassignedBills, setUnassignedBills] = useState([]);
@@ -34,8 +69,6 @@ const WeeklyBudgetPlanner = () => {
   const [showIncomeSetup, setShowIncomeSetup] = useState(false);
   const [editingBill, setEditingBill] = useState(null);
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: '', dueDay: '' });
-  const [incomeAmountX, setIncomeAmountX] = useState(2500);
-  const [incomeAmountY, setIncomeAmountY] = useState(1800);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Load saved data on mount
@@ -46,6 +79,7 @@ const WeeklyBudgetPlanner = () => {
         const savedMasterBills = await storage.get('masterBills');
         const savedAssignedBills = await storage.get('assignedBills');
         const savedUnassignedBills = await storage.get('unassignedBills');
+        const savedIncomeAmounts = await storage.get('incomeAmounts');
 
         if (savedMasterBills) {
           console.log('Loaded masterBills:', savedMasterBills);
@@ -56,6 +90,13 @@ const WeeklyBudgetPlanner = () => {
         }
         if (savedUnassignedBills) {
           setUnassignedBills(JSON.parse(savedUnassignedBills.value));
+        }
+        if (savedIncomeAmounts) {
+          const { amountX, amountY } = JSON.parse(savedIncomeAmounts.value);
+          setIncomeAmountX(amountX);
+          setIncomeAmountY(amountY);
+          // Regenerate weeks with loaded income amounts
+          setWeeks(generateWeeks(amountX, amountY));
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -662,14 +703,11 @@ const WeeklyBudgetPlanner = () => {
                   type="button"
                   onClick={(e) => {
                     e.preventDefault();
-                    console.log('Button clicked!');
+                    console.log('Applying income pattern:', incomeAmountX, incomeAmountY);
 
                     try {
-                      console.log('Starting inline pattern application');
-                      const updatedWeeks = weeks.map((week, index) => ({
-                        ...week,
-                        income: index % 2 === 0 ? incomeAmountX : incomeAmountY
-                      }));
+                      // Regenerate all weeks with new income amounts
+                      const updatedWeeks = generateWeeks(incomeAmountX, incomeAmountY);
                       setWeeks(updatedWeeks);
                       alert('Income pattern applied!');
                     } catch (error) {
