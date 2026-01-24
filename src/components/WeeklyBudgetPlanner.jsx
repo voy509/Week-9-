@@ -146,14 +146,24 @@ const WeeklyBudgetPlanner = () => {
       return;
     }
 
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+    // Calculate the date range covered by all weeks
+    const firstWeekDate = new Date(weeks[0].friday);
+    const lastWeekDate = new Date(weeks[weeks.length - 1].friday);
+
+    // Get the month/year range to generate bills for
+    const startMonth = firstWeekDate.getMonth();
+    const startYear = firstWeekDate.getFullYear();
+    const endMonth = lastWeekDate.getMonth();
+    const endYear = lastWeekDate.getFullYear();
+
+    // Calculate total months to cover
+    const totalMonths = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+
     const newBills = [];
 
-    for (let monthOffset = 0; monthOffset < 3; monthOffset++) {
-      const month = (currentMonth + monthOffset) % 12;
-      const year = currentYear + Math.floor((currentMonth + monthOffset) / 12);
+    for (let monthOffset = 0; monthOffset < totalMonths; monthOffset++) {
+      const month = (startMonth + monthOffset) % 12;
+      const year = startYear + Math.floor((startMonth + monthOffset) / 12);
 
       masterBills.filter(b => b.active).forEach(masterBill => {
         const billId = `${masterBill.id}-${month}-${year}`;
