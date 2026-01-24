@@ -70,6 +70,7 @@ const WeeklyBudgetPlanner = () => {
   const [editingBill, setEditingBill] = useState(null);
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: '', dueDay: '' });
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
   // Load saved data on mount
   useEffect(() => {
@@ -396,16 +397,25 @@ const WeeklyBudgetPlanner = () => {
     return colors[month] || colors[0];
   };
 
-  const getMonthlyBillStatus = () => {
+  // Get available years from weeks
+  const getAvailableYears = () => {
+    const years = new Set();
+    weeks.forEach(week => {
+      const date = new Date(week.friday);
+      years.add(date.getFullYear());
+    });
+    return Array.from(years).sort();
+  };
+
+  const getMonthlyBillStatus = (year) => {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentYear = 2026;
     const status = {};
 
     for (let month = 0; month < 12; month++) {
       const allBillsForMonth = [...unassignedBills, ...Object.values(assignedBills).flat()]
         .filter(bill => {
           const billDate = new Date(bill.dueDate);
-          return billDate.getMonth() === month && billDate.getFullYear() === currentYear;
+          return billDate.getMonth() === month && billDate.getFullYear() === year;
         });
 
       const uniqueBillIds = new Set();
@@ -415,7 +425,7 @@ const WeeklyBudgetPlanner = () => {
       const assignedBillsForMonth = Object.entries(assignedBills).flatMap(([weekId, bills]) =>
         bills.filter(bill => {
           const billDate = new Date(bill.dueDate);
-          return billDate.getMonth() === month && billDate.getFullYear() === currentYear;
+          return billDate.getMonth() === month && billDate.getFullYear() === year;
         }).map(bill => ({ ...bill, weekId }))
       );
 
@@ -491,7 +501,8 @@ const WeeklyBudgetPlanner = () => {
     }
   };
 
-  const monthlyStatus = getMonthlyBillStatus();
+  const availableYears = getAvailableYears();
+  const monthlyStatus = getMonthlyBillStatus(selectedYear);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6" onMouseMove={handleMouseMove} style={{ borderRadius: '24px' }}>
@@ -515,7 +526,44 @@ const WeeklyBudgetPlanner = () => {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-4 w-auto">
-            <h2 className="text-sm font-semibold mb-2 text-gray-700">Monthly Bill Status</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-700">Monthly Bill Status</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const currentIndex = availableYears.indexOf(selectedYear);
+                    if (currentIndex > 0) {
+                      setSelectedYear(availableYears[currentIndex - 1]);
+                    }
+                  }}
+                  disabled={availableYears.indexOf(selectedYear) === 0}
+                  className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 rounded transition"
+                >
+                  ◀
+                </button>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="text-xs border rounded px-2 py-1 bg-white"
+                >
+                  {availableYears.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    const currentIndex = availableYears.indexOf(selectedYear);
+                    if (currentIndex < availableYears.length - 1) {
+                      setSelectedYear(availableYears[currentIndex + 1]);
+                    }
+                  }}
+                  disabled={availableYears.indexOf(selectedYear) === availableYears.length - 1}
+                  className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 rounded transition"
+                >
+                  ▶
+                </button>
+              </div>
+            </div>
             <div className="grid grid-cols-6 gap-2 text-xs">
               {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(month => {
                 const data = monthlyStatus[month];
