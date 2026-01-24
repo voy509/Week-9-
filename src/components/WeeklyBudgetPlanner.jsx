@@ -86,7 +86,13 @@ const WeeklyBudgetPlanner = () => {
           setMasterBills(JSON.parse(savedMasterBills.value));
         }
         if (savedAssignedBills) {
-          setAssignedBills(JSON.parse(savedAssignedBills.value));
+          const loadedBills = JSON.parse(savedAssignedBills.value);
+          // Ensure we have all 56 week slots, merging old data
+          const mergedBills = {};
+          for (let i = 1; i <= 56; i++) {
+            mergedBills[i] = loadedBills[i] || [];
+          }
+          setAssignedBills(mergedBills);
         }
         if (savedUnassignedBills) {
           setUnassignedBills(JSON.parse(savedUnassignedBills.value));
