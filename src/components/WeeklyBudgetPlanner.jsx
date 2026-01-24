@@ -21,17 +21,25 @@ const formatDate = (date) => {
 };
 
 // Generate weeks: 4 past weeks + 52 future weeks = 56 total
+// Starting from 2026 onwards
 const generateWeeks = (incomeX, incomeY) => {
   const today = new Date();
   const mostRecentFriday = getMostRecentFriday(today);
 
-  // Start 4 weeks before the most recent Friday
+  // Ensure we don't go before 2026
+  const year2026Start = new Date('2026-01-01');
+  const firstFridayOf2026 = getMostRecentFriday(new Date('2026-01-02')); // Get first Friday of 2026
+
+  // If we're before 2026 or the calculated start would be before 2026, start from first Friday of 2026
   const startDate = new Date(mostRecentFriday);
-  startDate.setDate(startDate.getDate() - (4 * 7));
+  startDate.setDate(startDate.getDate() - (4 * 7)); // Go back 4 weeks
+
+  // If the start date is before 2026, use the first Friday of 2026 instead
+  const finalStartDate = startDate < year2026Start ? firstFridayOf2026 : startDate;
 
   const weeks = [];
   for (let i = 0; i < 56; i++) {
-    const weekDate = new Date(startDate);
+    const weekDate = new Date(finalStartDate);
     weekDate.setDate(weekDate.getDate() + (i * 7));
 
     weeks.push({
