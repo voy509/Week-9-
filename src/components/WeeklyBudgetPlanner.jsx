@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, AlertCircle, Trash2 } from 'lucide-react';
+import { Calendar, AlertCircle, Trash2, LogOut } from 'lucide-react';
 import storage from '../utils/storage';
+import { supabase } from '../lib/supabase';
+import Auth from './Auth';
 
 // Helper function to get the most recent Friday from a given date
 const getMostRecentFriday = (date) => {
@@ -53,6 +55,10 @@ const generateWeeks = (incomeX, incomeY) => {
 };
 
 const WeeklyBudgetPlanner = () => {
+  // Authentication state
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [incomeAmountX, setIncomeAmountX] = useState(2500);
   const [incomeAmountY, setIncomeAmountY] = useState(1800);
   const [weeks, setWeeks] = useState(() => generateWeeks(2500, 1800));
@@ -79,6 +85,46 @@ const WeeklyBudgetPlanner = () => {
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: '', dueDay: '' });
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+
+  // Check for existing auth session on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    // Listen for auth changes (login/logout)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Handle logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth screen if not logged in
+  if (!user) {
+    return <Auth onAuthSuccess={setUser} />;
+  }
 
   // Load saved data on mount
   useEffect(() => {
@@ -527,6 +573,21 @@ const WeeklyBudgetPlanner = () => {
       <div className="sticky top-0 bg-gray-50 z-20 pb-4 mb-2">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900 max-w-xs">Weekly Budget Planner</h1>
+
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-xs text-gray-500">Logged in as</p>
+              <p className="text-sm font-medium text-gray-700">{user?.email}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition text-sm font-medium flex items-center gap-2"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
 
           <div className="flex flex-col gap-2">
             <button
