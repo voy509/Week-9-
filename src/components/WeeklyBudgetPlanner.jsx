@@ -133,12 +133,28 @@ const WeeklyBudgetPlanner = () => {
           // Ensure we have all 56 week slots, merging old data
           const mergedBills = {};
           for (let i = 1; i <= 56; i++) {
-            mergedBills[i] = loadedBills[i] || [];
+            const weekBills = loadedBills[i] || [];
+            // Filter out any bills from 2025 or earlier
+            const filtered2026Only = weekBills.filter(bill => {
+              // Extract year from dueDate (format: M/D/YY)
+              const dateParts = bill.dueDate.split('/');
+              const year = parseInt('20' + dateParts[2]); // Convert YY to YYYY
+              return year >= 2026;
+            });
+            mergedBills[i] = filtered2026Only;
           }
           setAssignedBills(mergedBills);
         }
         if (savedUnassignedBills) {
-          setUnassignedBills(JSON.parse(savedUnassignedBills.value));
+          const loaded = JSON.parse(savedUnassignedBills.value);
+          // Filter out any bills from 2025 or earlier
+          const filtered2026Only = loaded.filter(bill => {
+            // Extract year from dueDate (format: M/D/YY)
+            const dateParts = bill.dueDate.split('/');
+            const year = parseInt('20' + dateParts[2]); // Convert YY to YYYY
+            return year >= 2026;
+          });
+          setUnassignedBills(filtered2026Only);
         }
         if (savedIncomeAmounts) {
           const { amountX, amountY } = JSON.parse(savedIncomeAmounts.value);
