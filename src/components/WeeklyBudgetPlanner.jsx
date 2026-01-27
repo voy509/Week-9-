@@ -103,31 +103,10 @@ const WeeklyBudgetPlanner = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Handle logout
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-  };
-
-  // Show loading state while checking auth
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show auth screen if not logged in
-  if (!user) {
-    return <Auth onAuthSuccess={setUser} />;
-  }
-
-  // Load saved data on mount
+  // Load saved data on mount - only runs when user is logged in
   useEffect(() => {
+    if (!user) return;
+
     const loadData = async () => {
       try {
         console.log('Loading data from storage...');
@@ -166,13 +145,13 @@ const WeeklyBudgetPlanner = () => {
       }
     };
     loadData();
-  }, []);
+  }, [user]);
 
   // Save data whenever it changes
   useEffect(() => {
-    // Skip saving during initial load to prevent overwriting saved data with defaults
-    if (isInitialLoad) {
-      console.log('Skipping save during initial load');
+    // Skip if not logged in or during initial load
+    if (!user || isInitialLoad) {
+      if (isInitialLoad) console.log('Skipping save during initial load');
       return;
     }
 
@@ -191,12 +170,12 @@ const WeeklyBudgetPlanner = () => {
       }
     };
     saveData();
-  }, [masterBills, assignedBills, unassignedBills, weeks, incomeAmountX, incomeAmountY, isInitialLoad]);
+  }, [user, masterBills, assignedBills, unassignedBills, weeks, incomeAmountX, incomeAmountY, isInitialLoad]);
 
   useEffect(() => {
-    // Skip bill generation during initial load to prevent duplicates
-    if (isInitialLoad) {
-      console.log('Skipping bill generation during initial load');
+    // Skip bill generation if not logged in or during initial load
+    if (!user || isInitialLoad) {
+      if (isInitialLoad) console.log('Skipping bill generation during initial load');
       return;
     }
 
@@ -250,7 +229,7 @@ const WeeklyBudgetPlanner = () => {
       const activeMasterIds = new Set(masterBills.filter(b => b.active).map(b => b.id));
       setUnassignedBills(prev => prev.filter(b => activeMasterIds.has(b.originalId)));
     }
-  }, [masterBills, isInitialLoad]);
+  }, [user, masterBills, isInitialLoad]);
 
   useEffect(() => {
     if (!draggedBill && autoScrollInterval) {
@@ -567,6 +546,29 @@ const WeeklyBudgetPlanner = () => {
 
   const availableYears = getAvailableYears();
   const monthlyStatus = getMonthlyBillStatus(selectedYear);
+
+  // Handle logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth screen if not logged in
+  if (!user) {
+    return <Auth onAuthSuccess={setUser} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6" onMouseMove={handleMouseMove} style={{ borderRadius: '24px' }}>
