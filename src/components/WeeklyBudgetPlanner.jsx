@@ -23,25 +23,34 @@ const formatDate = (date) => {
 };
 
 // Generate weeks: 4 past weeks + 52 future weeks = 56 total
-// Starting from 2026 onwards
+// Starting from 2026 onwards - NEVER show any 2025 dates
 const generateWeeks = (incomeX, incomeY) => {
   const today = new Date();
   const mostRecentFriday = getMostRecentFriday(today);
 
-  // Ensure we don't go before 2026
-  const year2026Start = new Date('2026-01-01');
-  const firstFridayOf2026 = getMostRecentFriday(new Date('2026-01-02')); // Get first Friday of 2026
-
-  // If we're before 2026 or the calculated start would be before 2026, start from first Friday of 2026
-  const startDate = new Date(mostRecentFriday);
+  // Calculate the start date (4 weeks back from most recent Friday)
+  let startDate = new Date(mostRecentFriday);
   startDate.setDate(startDate.getDate() - (4 * 7)); // Go back 4 weeks
 
-  // If the start date is before 2026, use the first Friday of 2026 instead
-  const finalStartDate = startDate < year2026Start ? firstFridayOf2026 : startDate;
+  // CRITICAL: Ensure we NEVER show any dates before 2026
+  // If the calculated start date is in 2025 or earlier, use the first Friday in 2026
+  if (startDate.getFullYear() < 2026) {
+    // Find the first Friday in 2026 - start from Jan 1 and find next Friday
+    let firstDay2026 = new Date(2026, 0, 1); // January 1, 2026
+    let dayOfWeek = firstDay2026.getDay();
+
+    // Calculate days until Friday (5 = Friday)
+    let daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+    if (daysUntilFriday === 0 && dayOfWeek !== 5) {
+      daysUntilFriday = 7;
+    }
+
+    startDate = new Date(2026, 0, 1 + daysUntilFriday);
+  }
 
   const weeks = [];
   for (let i = 0; i < 56; i++) {
-    const weekDate = new Date(finalStartDate);
+    const weekDate = new Date(startDate);
     weekDate.setDate(weekDate.getDate() + (i * 7));
 
     weeks.push({
@@ -197,6 +206,11 @@ const WeeklyBudgetPlanner = () => {
     for (let monthOffset = 0; monthOffset < totalMonths; monthOffset++) {
       const month = (startMonth + monthOffset) % 12;
       const year = startYear + Math.floor((startMonth + monthOffset) / 12);
+
+      // CRITICAL: Skip any bills for 2025 or earlier
+      if (year < 2026) {
+        continue;
+      }
 
       masterBills.filter(b => b.active).forEach(masterBill => {
         const billId = `${masterBill.id}-${month}-${year}`;
