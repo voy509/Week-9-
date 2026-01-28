@@ -171,7 +171,7 @@ const WeeklyBudgetPlanner = () => {
     loadData();
   }, [user]);
 
-  // Save data to Supabase whenever it changes
+  // Save data to Supabase whenever it changes (debounced)
   useEffect(() => {
     // Skip if not logged in or during initial load
     if (!user || isInitialLoad) {
@@ -180,24 +180,30 @@ const WeeklyBudgetPlanner = () => {
     }
 
     console.log('Save useEffect triggered! masterBills count:', masterBills.length);
-    const saveData = async () => {
-      try {
-        console.log('Saving data to Supabase...');
 
-        // Save all data in parallel
-        await Promise.all([
-          saveMasterBills(user.id, masterBills),
-          saveAssignedBills(user.id, assignedBills),
-          saveUnassignedBills(user.id, unassignedBills),
-          saveIncomeSettings(user.id, incomeAmountX, incomeAmountY)
-        ]);
+    // Debounce to prevent excessive saves
+    const timer = setTimeout(() => {
+      const saveData = async () => {
+        try {
+          console.log('Saving data to Supabase...');
 
-        console.log('Data saved successfully to Supabase!');
-      } catch (error) {
-        console.error('Failed to save data to Supabase:', error);
-      }
-    };
-    saveData();
+          // Save all data in parallel
+          await Promise.all([
+            saveMasterBills(user.id, masterBills),
+            saveAssignedBills(user.id, assignedBills),
+            saveUnassignedBills(user.id, unassignedBills),
+            saveIncomeSettings(user.id, incomeAmountX, incomeAmountY)
+          ]);
+
+          console.log('Data saved successfully to Supabase!');
+        } catch (error) {
+          console.error('Failed to save data to Supabase:', error);
+        }
+      };
+      saveData();
+    }, 500); // 500ms debounce for saves
+
+    return () => clearTimeout(timer);
   }, [user, masterBills, assignedBills, unassignedBills, incomeAmountX, incomeAmountY, isInitialLoad]);
 
   useEffect(() => {
@@ -207,62 +213,73 @@ const WeeklyBudgetPlanner = () => {
       return;
     }
 
-    // Calculate the date range covered by all weeks
-    const firstWeekDate = new Date(weeks[0].friday);
-    const lastWeekDate = new Date(weeks[weeks.length - 1].friday);
+    // Debounce to prevent duplicate bill generation
+    const timer = setTimeout(() => {
+      // Calculate the date range covered by all weeks
+      const firstWeekDate = new Date(weeks[0].friday);
+      const lastWeekDate = new Date(weeks[weeks.length - 1].friday);
 
-    // Get the month/year range to generate bills for
-    const startMonth = firstWeekDate.getMonth();
-    const startYear = firstWeekDate.getFullYear();
-    const endMonth = lastWeekDate.getMonth();
-    const endYear = lastWeekDate.getFullYear();
+      // Get the month/year range to generate bills for
+      const startMonth = firstWeekDate.getMonth();
+      const startYear = firstWeekDate.getFullYear();
+      const endMonth = lastWeekDate.getMonth();
+      const endYear = lastWeekDate.getFullYear();
 
-    // Calculate total months to cover
-    const totalMonths = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
+      // Calculate total months to cover
+      const totalMonths = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
 
-    const newBills = [];
+      const newBills = [];
 
-    for (let monthOffset = 0; monthOffset < totalMonths; monthOffset++) {
-      const month = (startMonth + monthOffset) % 12;
-      const year = startYear + Math.floor((startMonth + monthOffset) / 12);
+      for (let monthOffset = 0; monthOffset < totalMonths; monthOffset++) {
+        const month = (startMonth + monthOffset) % 12;
+        const year = startYear + Math.floor((startMonth + monthOffset) / 12);
 
-      // CRITICAL: Skip any bills for 2025 or earlier
-      if (year < 2026) {
-        continue;
+        // CRITICAL: Skip any bills for 2025 or earlier
+        if (year < 2026) {
+          continue;
+        }
+
+        masterBills.filter(b => b.active).forEach(masterBill => {
+          const billId = `${masterBill.id}-${month}-${year}`;
+          const existsInUnassigned = unassignedBills.some(b => b.id === billId);
+          const existsInAssigned = Object.values(assignedBills).flat().some(b => b.id === billId);
+
+          if (!existsInUnassigned && !existsInAssigned) {
+            newBills.push({
+              id: billId,
+              name: masterBill.name,
+              amount: masterBill.amount,
+              dueDate: `${month + 1}/${masterBill.dueDay}/${String(year).slice(-2)}`,
+              originalId: masterBill.id,
+              originalName: masterBill.name,
+              originalDueDate: `${month + 1}/${masterBill.dueDay}/${String(year).slice(-2)}`
+            });
+          }
+        });
       }
 
-      masterBills.filter(b => b.active).forEach(masterBill => {
-        const billId = `${masterBill.id}-${month}-${year}`;
-        const existsInUnassigned = unassignedBills.some(b => b.id === billId);
-        const existsInAssigned = Object.values(assignedBills).flat().some(b => b.id === billId);
+      if (newBills.length > 0) {
+        console.log('Generating', newBills.length, 'new bills');
+        setUnassignedBills(prev => {
+          // Remove any bills whose master bill is no longer active
+          const activeMasterIds = new Set(masterBills.filter(b => b.active).map(b => b.id));
+          const filtered = prev.filter(b => activeMasterIds.has(b.originalId));
 
-        if (!existsInUnassigned && !existsInAssigned) {
-          newBills.push({
-            id: billId,
-            name: masterBill.name,
-            amount: masterBill.amount,
-            dueDate: `${month + 1}/${masterBill.dueDay}/${String(year).slice(-2)}`,
-            originalId: masterBill.id,
-            originalName: masterBill.name,
-            originalDueDate: `${month + 1}/${masterBill.dueDay}/${String(year).slice(-2)}`
-          });
-        }
-      });
-    }
+          // Double-check for duplicates before adding
+          const existingIds = new Set(filtered.map(b => b.id));
+          const uniqueNewBills = newBills.filter(b => !existingIds.has(b.id));
 
-    if (newBills.length > 0) {
-      setUnassignedBills(prev => {
-        // Remove any bills whose master bill is no longer active
+          return [...filtered, ...uniqueNewBills];
+        });
+      } else {
+        // Even if no new bills, still filter out inactive ones
         const activeMasterIds = new Set(masterBills.filter(b => b.active).map(b => b.id));
-        const filtered = prev.filter(b => activeMasterIds.has(b.originalId));
-        return [...filtered, ...newBills];
-      });
-    } else {
-      // Even if no new bills, still filter out inactive ones
-      const activeMasterIds = new Set(masterBills.filter(b => b.active).map(b => b.id));
-      setUnassignedBills(prev => prev.filter(b => activeMasterIds.has(b.originalId)));
-    }
-  }, [user, masterBills, isInitialLoad]);
+        setUnassignedBills(prev => prev.filter(b => activeMasterIds.has(b.originalId)));
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
+  }, [user, masterBills, unassignedBills, assignedBills, weeks, isInitialLoad]);
 
   useEffect(() => {
     if (!draggedBill && autoScrollInterval) {
