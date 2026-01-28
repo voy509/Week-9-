@@ -77,7 +77,7 @@ export async function loadAssignedBills(userId) {
       if (assignedBills[bill.week_id]) {
         assignedBills[bill.week_id].push({
           id: bill.bill_id,
-          name: bill.bill_name,
+          name: bill.name,
           amount: parseFloat(bill.amount),
           dueDate: bill.due_date,
           originalId: bill.original_id,
@@ -115,7 +115,7 @@ export async function saveAssignedBills(userId, assignedBills) {
           user_id: userId,
           week_id: parseInt(weekId),
           bill_id: bill.id,
-          bill_name: bill.name,
+          name: bill.name,
           amount: bill.amount,
           due_date: bill.dueDate,
           original_id: bill.originalId,
@@ -146,19 +146,24 @@ export async function loadUnassignedBills(userId) {
       .from('unassigned_bills')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: true });
+      .order('id', { ascending: true });
 
     if (error) throw error;
 
-    return data.map(bill => ({
-      id: bill.bill_id,
-      name: bill.bill_name,
-      amount: parseFloat(bill.amount),
-      dueDate: bill.due_date,
-      originalId: bill.original_id,
-      originalName: bill.original_name,
-      originalDueDate: bill.original_due_date
-    }));
+    return data.map(bill => {
+      // Parse originalId from the id field (format: "masterBillId-month-year")
+      const originalId = bill.id ? parseInt(bill.id.toString().split('-')[0]) : null;
+
+      return {
+        id: bill.id,
+        name: bill.name,
+        amount: parseFloat(bill.amount),
+        dueDate: bill.due_date,
+        originalId: originalId,
+        originalName: bill.name,
+        originalDueDate: bill.due_date
+      };
+    });
   } catch (error) {
     console.error('Error loading unassigned bills:', error);
     return [];
@@ -176,14 +181,11 @@ export async function saveUnassignedBills(userId, bills) {
     // Insert new bills
     if (bills.length > 0) {
       const billsToInsert = bills.map(bill => ({
+        id: bill.id,  // Use the generated bill ID (e.g., "1-0-2026")
         user_id: userId,
-        bill_id: bill.id,
-        bill_name: bill.name,
+        name: bill.name,
         amount: bill.amount,
-        due_date: bill.dueDate,
-        original_id: bill.originalId,
-        original_name: bill.originalName,
-        original_due_date: bill.originalDueDate
+        due_date: bill.dueDate
       }));
 
       const { error } = await supabase
