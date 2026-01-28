@@ -217,8 +217,8 @@ export async function loadIncomeSettings(userId) {
     }
 
     return {
-      incomeX: parseFloat(data.income_x),
-      incomeY: parseFloat(data.income_y)
+      incomeX: parseFloat(data.amount_x),
+      incomeY: parseFloat(data.amount_y)
     };
   } catch (error) {
     console.error('Error loading income settings:', error);
@@ -232,8 +232,8 @@ export async function saveIncomeSettings(userId, incomeX, incomeY) {
       .from('income_settings')
       .upsert({
         user_id: userId,
-        income_x: incomeX,
-        income_y: incomeY,
+        amount_x: incomeX,
+        amount_y: incomeY,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'user_id'
