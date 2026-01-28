@@ -28,15 +28,30 @@ export async function loadMasterBills(userId) {
 
 export async function saveMasterBills(userId, bills) {
   try {
-    // Delete all existing bills for this user
-    await supabase
+    // First, get existing bills to know which ones to delete
+    const { data: existing, error: fetchError } = await supabase
       .from('master_bills')
-      .delete()
+      .select('id')
       .eq('user_id', userId);
 
-    // Insert new bills
+    if (fetchError) throw fetchError;
+
+    const existingIds = new Set(existing?.map(b => b.id) || []);
+    const currentIds = new Set(bills.map(b => b.id).filter(id => id));
+
+    // Delete bills that no longer exist in the current list
+    const idsToDelete = [...existingIds].filter(id => !currentIds.has(id));
+    if (idsToDelete.length > 0) {
+      await supabase
+        .from('master_bills')
+        .delete()
+        .in('id', idsToDelete);
+    }
+
+    // Upsert bills (insert new ones or update existing ones)
     if (bills.length > 0) {
-      const billsToInsert = bills.map(bill => ({
+      const billsToUpsert = bills.map(bill => ({
+        ...(bill.id ? { id: bill.id } : {}), // Include ID if it exists
         user_id: userId,
         name: bill.name,
         amount: bill.amount,
@@ -46,7 +61,9 @@ export async function saveMasterBills(userId, bills) {
 
       const { error } = await supabase
         .from('master_bills')
-        .insert(billsToInsert);
+        .upsert(billsToUpsert, {
+          onConflict: 'id'
+        });
 
       if (error) throw error;
     }

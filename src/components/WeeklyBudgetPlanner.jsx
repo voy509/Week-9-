@@ -171,7 +171,7 @@ const WeeklyBudgetPlanner = () => {
     loadData();
   }, [user]);
 
-  // Save data to Supabase whenever it changes
+  // Save data to Supabase whenever it changes (debounced)
   useEffect(() => {
     // Skip if not logged in or during initial load
     if (!user || isInitialLoad) {
@@ -180,24 +180,30 @@ const WeeklyBudgetPlanner = () => {
     }
 
     console.log('Save useEffect triggered! masterBills count:', masterBills.length);
-    const saveData = async () => {
-      try {
-        console.log('Saving data to Supabase...');
 
-        // Save all data in parallel
-        await Promise.all([
-          saveMasterBills(user.id, masterBills),
-          saveAssignedBills(user.id, assignedBills),
-          saveUnassignedBills(user.id, unassignedBills),
-          saveIncomeSettings(user.id, incomeAmountX, incomeAmountY)
-        ]);
+    // Debounce to prevent excessive saves
+    const timer = setTimeout(() => {
+      const saveData = async () => {
+        try {
+          console.log('Saving data to Supabase...');
 
-        console.log('Data saved successfully to Supabase!');
-      } catch (error) {
-        console.error('Failed to save data to Supabase:', error);
-      }
-    };
-    saveData();
+          // Save all data in parallel
+          await Promise.all([
+            saveMasterBills(user.id, masterBills),
+            saveAssignedBills(user.id, assignedBills),
+            saveUnassignedBills(user.id, unassignedBills),
+            saveIncomeSettings(user.id, incomeAmountX, incomeAmountY)
+          ]);
+
+          console.log('Data saved successfully to Supabase!');
+        } catch (error) {
+          console.error('Failed to save data to Supabase:', error);
+        }
+      };
+      saveData();
+    }, 500); // 500ms debounce for saves
+
+    return () => clearTimeout(timer);
   }, [user, masterBills, assignedBills, unassignedBills, incomeAmountX, incomeAmountY, isInitialLoad]);
 
   useEffect(() => {
