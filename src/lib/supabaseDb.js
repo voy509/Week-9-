@@ -17,7 +17,7 @@ export async function loadMasterBills(userId) {
       id: bill.id,
       name: bill.name,
       amount: parseFloat(bill.amount),
-      dueDay: bill.due_day,
+      dueDay: bill.due_date,
       active: bill.active
     }));
   } catch (error) {
@@ -40,7 +40,7 @@ export async function saveMasterBills(userId, bills) {
         user_id: userId,
         name: bill.name,
         amount: bill.amount,
-        due_day: bill.dueDay,
+        due_date: bill.dueDay,
         active: bill.active
       }));
 
