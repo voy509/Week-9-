@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, AlertCircle, Trash2, LogOut } from 'lucide-react';
-import storage from '../utils/storage';
 import { supabase } from '../lib/supabase';
+import {
+  loadMasterBills,
+  saveMasterBills,
+  loadAssignedBills,
+  saveAssignedBills,
+  loadUnassignedBills,
+  saveUnassignedBills,
+  loadIncomeSettings,
+  saveIncomeSettings
+} from '../lib/supabaseDb';
 import Auth from './Auth';
 
 // Helper function to get the most recent Friday from a given date
@@ -112,59 +121,49 @@ const WeeklyBudgetPlanner = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load saved data on mount - only runs when user is logged in
+  // Load saved data from Supabase on mount - only runs when user is logged in
   useEffect(() => {
     if (!user) return;
 
     const loadData = async () => {
       try {
-        console.log('Loading data from storage...');
-        const savedMasterBills = await storage.get('masterBills');
-        const savedAssignedBills = await storage.get('assignedBills');
-        const savedUnassignedBills = await storage.get('unassignedBills');
-        const savedIncomeAmounts = await storage.get('incomeAmounts');
+        console.log('Loading data from Supabase...');
 
-        if (savedMasterBills) {
-          console.log('Loaded masterBills:', savedMasterBills);
-          setMasterBills(JSON.parse(savedMasterBills.value));
-        }
-        if (savedAssignedBills) {
-          const loadedBills = JSON.parse(savedAssignedBills.value);
-          // Ensure we have all 56 week slots, merging old data
-          const mergedBills = {};
-          for (let i = 1; i <= 56; i++) {
-            const weekBills = loadedBills[i] || [];
-            // Filter out any bills from 2025 or earlier
-            const filtered2026Only = weekBills.filter(bill => {
-              // Extract year from dueDate (format: M/D/YY)
-              const dateParts = bill.dueDate.split('/');
-              const year = parseInt('20' + dateParts[2]); // Convert YY to YYYY
-              return year >= 2026;
-            });
-            mergedBills[i] = filtered2026Only;
-          }
-          setAssignedBills(mergedBills);
-        }
-        if (savedUnassignedBills) {
-          const loaded = JSON.parse(savedUnassignedBills.value);
-          // Filter out any bills from 2025 or earlier
-          const filtered2026Only = loaded.filter(bill => {
-            // Extract year from dueDate (format: M/D/YY)
+        // Load all data in parallel
+        const [masterBills, assignedBills, unassignedBills, incomeSettings] = await Promise.all([
+          loadMasterBills(user.id),
+          loadAssignedBills(user.id),
+          loadUnassignedBills(user.id),
+          loadIncomeSettings(user.id)
+        ]);
+
+        console.log('Loaded data:', { masterBills, assignedBills, unassignedBills, incomeSettings });
+
+        // Filter out any 2025 bills from assigned bills
+        const filtered2026AssignedBills = {};
+        Object.entries(assignedBills).forEach(([weekId, bills]) => {
+          filtered2026AssignedBills[weekId] = bills.filter(bill => {
             const dateParts = bill.dueDate.split('/');
-            const year = parseInt('20' + dateParts[2]); // Convert YY to YYYY
+            const year = parseInt('20' + dateParts[2]);
             return year >= 2026;
           });
-          setUnassignedBills(filtered2026Only);
-        }
-        if (savedIncomeAmounts) {
-          const { amountX, amountY } = JSON.parse(savedIncomeAmounts.value);
-          setIncomeAmountX(amountX);
-          setIncomeAmountY(amountY);
-          // Regenerate weeks with loaded income amounts
-          setWeeks(generateWeeks(amountX, amountY));
-        }
+        });
+
+        // Filter out any 2025 bills from unassigned bills
+        const filtered2026UnassignedBills = unassignedBills.filter(bill => {
+          const dateParts = bill.dueDate.split('/');
+          const year = parseInt('20' + dateParts[2]);
+          return year >= 2026;
+        });
+
+        setMasterBills(masterBills);
+        setAssignedBills(filtered2026AssignedBills);
+        setUnassignedBills(filtered2026UnassignedBills);
+        setIncomeAmountX(incomeSettings.incomeX);
+        setIncomeAmountY(incomeSettings.incomeY);
+        setWeeks(generateWeeks(incomeSettings.incomeX, incomeSettings.incomeY));
       } catch (error) {
-        console.error('Error loading data:', error);
+        console.error('Error loading data from Supabase:', error);
       } finally {
         setIsInitialLoad(false);
       }
@@ -172,7 +171,7 @@ const WeeklyBudgetPlanner = () => {
     loadData();
   }, [user]);
 
-  // Save data whenever it changes
+  // Save data to Supabase whenever it changes
   useEffect(() => {
     // Skip if not logged in or during initial load
     if (!user || isInitialLoad) {
@@ -183,19 +182,23 @@ const WeeklyBudgetPlanner = () => {
     console.log('Save useEffect triggered! masterBills count:', masterBills.length);
     const saveData = async () => {
       try {
-        console.log('Saving data to storage...');
-        await storage.set('masterBills', JSON.stringify(masterBills));
-        await storage.set('assignedBills', JSON.stringify(assignedBills));
-        await storage.set('unassignedBills', JSON.stringify(unassignedBills));
-        await storage.set('weeks', JSON.stringify(weeks));
-        await storage.set('incomeAmounts', JSON.stringify({ amountX: incomeAmountX, amountY: incomeAmountY }));
-        console.log('Data saved successfully!');
+        console.log('Saving data to Supabase...');
+
+        // Save all data in parallel
+        await Promise.all([
+          saveMasterBills(user.id, masterBills),
+          saveAssignedBills(user.id, assignedBills),
+          saveUnassignedBills(user.id, unassignedBills),
+          saveIncomeSettings(user.id, incomeAmountX, incomeAmountY)
+        ]);
+
+        console.log('Data saved successfully to Supabase!');
       } catch (error) {
-        console.error('Failed to save data:', error);
+        console.error('Failed to save data to Supabase:', error);
       }
     };
     saveData();
-  }, [user, masterBills, assignedBills, unassignedBills, weeks, incomeAmountX, incomeAmountY, isInitialLoad]);
+  }, [user, masterBills, assignedBills, unassignedBills, incomeAmountX, incomeAmountY, isInitialLoad]);
 
   useEffect(() => {
     // Skip bill generation if not logged in or during initial load
