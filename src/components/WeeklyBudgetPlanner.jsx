@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, AlertCircle, Trash2, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
@@ -103,6 +103,14 @@ const WeeklyBudgetPlanner = () => {
   const [newBillForm, setNewBillForm] = useState({ name: '', amount: '', dueDay: '' });
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+
+  // Ref to track latest assignedBills without causing dependency issues
+  const assignedBillsRef = useRef(assignedBills);
+
+  // Keep ref in sync with assignedBills
+  useEffect(() => {
+    assignedBillsRef.current = assignedBills;
+  }, [assignedBills]);
 
   // Check for existing auth session on mount
   useEffect(() => {
@@ -228,58 +236,56 @@ const WeeklyBudgetPlanner = () => {
       // Calculate total months to cover
       const totalMonths = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
 
-      const newBills = [];
+      setUnassignedBills(prevUnassigned => {
+        const newBills = [];
 
-      for (let monthOffset = 0; monthOffset < totalMonths; monthOffset++) {
-        const month = (startMonth + monthOffset) % 12;
-        const year = startYear + Math.floor((startMonth + monthOffset) / 12);
+        for (let monthOffset = 0; monthOffset < totalMonths; monthOffset++) {
+          const month = (startMonth + monthOffset) % 12;
+          const year = startYear + Math.floor((startMonth + monthOffset) / 12);
 
-        // CRITICAL: Skip any bills for 2025 or earlier
-        if (year < 2026) {
-          continue;
+          // CRITICAL: Skip any bills for 2025 or earlier
+          if (year < 2026) {
+            continue;
+          }
+
+          masterBills.filter(b => b.active).forEach(masterBill => {
+            const billId = `${masterBill.id}-${month}-${year}`;
+            const existsInUnassigned = prevUnassigned.some(b => b.id === billId);
+            // Use ref to check assigned bills without triggering re-renders
+            const existsInAssigned = Object.values(assignedBillsRef.current).flat().some(b => b.id === billId);
+
+            if (!existsInUnassigned && !existsInAssigned) {
+              newBills.push({
+                id: billId,
+                name: masterBill.name,
+                amount: masterBill.amount,
+                dueDate: `${month + 1}/${masterBill.dueDay}/${String(year).slice(-2)}`,
+                originalId: masterBill.id,
+                originalName: masterBill.name,
+                originalDueDate: `${month + 1}/${masterBill.dueDay}/${String(year).slice(-2)}`
+              });
+            }
+          });
         }
 
-        masterBills.filter(b => b.active).forEach(masterBill => {
-          const billId = `${masterBill.id}-${month}-${year}`;
-          const existsInUnassigned = unassignedBills.some(b => b.id === billId);
-          const existsInAssigned = Object.values(assignedBills).flat().some(b => b.id === billId);
+        // Remove any bills whose master bill is no longer active
+        const activeMasterIds = new Set(masterBills.filter(b => b.active).map(b => b.id));
+        const filtered = prevUnassigned.filter(b => activeMasterIds.has(b.originalId));
 
-          if (!existsInUnassigned && !existsInAssigned) {
-            newBills.push({
-              id: billId,
-              name: masterBill.name,
-              amount: masterBill.amount,
-              dueDate: `${month + 1}/${masterBill.dueDay}/${String(year).slice(-2)}`,
-              originalId: masterBill.id,
-              originalName: masterBill.name,
-              originalDueDate: `${month + 1}/${masterBill.dueDay}/${String(year).slice(-2)}`
-            });
-          }
-        });
-      }
-
-      if (newBills.length > 0) {
-        console.log('Generating', newBills.length, 'new bills');
-        setUnassignedBills(prev => {
-          // Remove any bills whose master bill is no longer active
-          const activeMasterIds = new Set(masterBills.filter(b => b.active).map(b => b.id));
-          const filtered = prev.filter(b => activeMasterIds.has(b.originalId));
-
+        if (newBills.length > 0) {
+          console.log('Generating', newBills.length, 'new bills');
           // Double-check for duplicates before adding
           const existingIds = new Set(filtered.map(b => b.id));
           const uniqueNewBills = newBills.filter(b => !existingIds.has(b.id));
-
           return [...filtered, ...uniqueNewBills];
-        });
-      } else {
-        // Even if no new bills, still filter out inactive ones
-        const activeMasterIds = new Set(masterBills.filter(b => b.active).map(b => b.id));
-        setUnassignedBills(prev => prev.filter(b => activeMasterIds.has(b.originalId)));
-      }
+        } else {
+          return filtered;
+        }
+      });
     }, 300); // 300ms debounce
 
     return () => clearTimeout(timer);
-  }, [user, masterBills, unassignedBills, assignedBills, weeks, isInitialLoad]);
+  }, [user, masterBills, weeks, isInitialLoad]);
 
   useEffect(() => {
     if (!draggedBill && autoScrollInterval) {
