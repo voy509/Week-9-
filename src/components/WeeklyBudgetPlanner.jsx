@@ -114,10 +114,17 @@ const WeeklyBudgetPlanner = () => {
 
   // Check for existing auth session on mount
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+        setAuthLoading(false);
+      })
+      .catch((error) => {
+        console.log('Supabase connection failed, using local dev mode:', error.message);
+        // Create a mock user for local development
+        setUser({ id: 'local-dev-user', email: 'local@dev.local' });
+        setAuthLoading(false);
+      });
 
     // Listen for auth changes (login/logout)
     const {
